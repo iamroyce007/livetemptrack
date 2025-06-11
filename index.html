@@ -34,6 +34,19 @@
     .label {
       font-size: 1.2em;
     }
+    .bar-container {
+      background: #333;
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: red;
+      transition: width 0.5s ease, background 0.5s ease;
+    }
     .status-light {
       display: inline-block;
       width: 12px;
@@ -76,12 +89,14 @@
     <div class="label"><span class="status-light" id="statusLight" style="background:red"></span>🌡️ Ambient Temperature</div>
     <div id="ambientC" class="temp-value">-- °C</div>
     <div id="ambientF" class="temp-value">-- °F</div>
+    <div class="bar-container"><div id="ambientBar" class="bar"></div></div>
   </div>
 
   <div class="card" id="objectCard">
     <div class="label">🔥 Object Temperature</div>
     <div id="objectC" class="temp-value">-- °C</div>
     <div id="objectF" class="temp-value">-- °F</div>
+    <div class="bar-container"><div id="objectBar" class="bar"></div></div>
   </div>
 
   <div id="installBanner">
@@ -115,6 +130,13 @@
       return `0 0 30px rgb(${r},0,${b})`;
     }
 
+    function tempToColor(tempC) {
+      let percent = Math.min(Math.max((tempC - 20) / 20, 0), 1);
+      let r = Math.round(255 * percent);
+      let b = Math.round(255 * (1 - percent));
+      return `rgb(${r},0,${b})`;
+    }
+
     async function fetchData() {
       try {
         const response = await fetch('https://livetempesp32-default-rtdb.firebaseio.com/temperature.json');
@@ -135,6 +157,12 @@
 
         document.getElementById('ambientCard').style.boxShadow = tempToGlowColor(data.ambient);
         document.getElementById('objectCard').style.boxShadow = tempToGlowColor(data.object);
+
+        document.getElementById('ambientBar').style.width = Math.min((data.ambient - 20) * 5, 100) + '%';
+        document.getElementById('objectBar').style.width = Math.min((data.object - 20) * 5, 100) + '%';
+        document.getElementById('ambientBar').style.background = tempToColor(data.ambient);
+        document.getElementById('objectBar').style.background = tempToColor(data.object);
+
       } catch (err) {
         document.getElementById('ambientC').innerText = '-- °C';
         document.getElementById('ambientF').innerText = '-- °F';
@@ -143,6 +171,191 @@
         document.getElementById('statusLight').style.background = 'red';
         document.getElementById('ambientCard').style.boxShadow = '0 0 30px rgba(255, 0, 0, 0.6)';
         document.getElementById('objectCard').style.boxShadow = '0 0 30px rgba(255, 0, 0, 0.6)';
+        document.getElementById('ambientBar').style.width = '0%';
+        document.getElementById('objectBar').style.width = '0%';
+      }
+    }
+
+    setInterval(fetchData, 1500);
+    fetchData();
+  </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Realtime Temperature</title>
+  <style>
+    body {
+      background-color: #0e0e2c;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #00cfff;
+      margin-bottom: 30px;
+    }
+    .card {
+      background: #1e1e3f;
+      border-radius: 16px;
+      padding: 20px;
+      margin: 20px auto;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+      transition: box-shadow 0.6s ease;
+    }
+    .temp-value {
+      font-size: 2em;
+      margin: 10px 0;
+    }
+    .label {
+      font-size: 1.2em;
+    }
+    .bar-container {
+      background: #333;
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: red;
+      transition: width 0.5s ease, background 0.5s ease;
+    }
+    .status-light {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    @media (max-width: 600px) {
+      .temp-value { font-size: 1.5em; }
+      .label { font-size: 1em; }
+    }
+    #installBanner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #1e1e3f;
+      color: white;
+      padding: 15px;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 9999;
+    }
+    #installBanner button {
+      background-color: #00cfff;
+      color: black;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Realtime Temperature</h1>
+
+  <div class="card" id="ambientCard">
+    <div class="label"><span class="status-light" id="statusLight" style="background:red"></span>🌡️ Ambient Temperature</div>
+    <div id="ambientC" class="temp-value">-- °C</div>
+    <div id="ambientF" class="temp-value">-- °F</div>
+    <div class="bar-container"><div id="ambientBar" class="bar"></div></div>
+  </div>
+
+  <div class="card" id="objectCard">
+    <div class="label">🔥 Object Temperature</div>
+    <div id="objectC" class="temp-value">-- °C</div>
+    <div id="objectF" class="temp-value">-- °F</div>
+    <div class="bar-container"><div id="objectBar" class="bar"></div></div>
+  </div>
+
+  <div id="installBanner">
+    <span>Add this app to your home screen for quick access.</span>
+    <button id="installBtn">Add</button>
+  </div>
+
+  <script>
+    let deferredPrompt;
+    const installBanner = document.getElementById('installBanner');
+    const installBtn = document.getElementById('installBtn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBanner.style.display = 'flex';
+    });
+
+    installBtn.addEventListener('click', () => {
+      installBanner.style.display = 'none';
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt = null;
+      }
+    });
+
+    function tempToGlowColor(tempC) {
+      let percent = Math.min(Math.max((tempC - 20) / 20, 0), 1);
+      let r = Math.round(255 * percent);
+      let b = Math.round(255 * (1 - percent));
+      return `0 0 30px rgb(${r},0,${b})`;
+    }
+
+    function tempToColor(tempC) {
+      let percent = Math.min(Math.max((tempC - 20) / 20, 0), 1);
+      let r = Math.round(255 * percent);
+      let b = Math.round(255 * (1 - percent));
+      return `rgb(${r},0,${b})`;
+    }
+
+    async function fetchData() {
+      try {
+        const response = await fetch('https://livetempesp32-default-rtdb.firebaseio.com/temperature.json');
+        if (!response.ok) throw new Error("Disconnected");
+        const data = await response.json();
+
+        const ambC = data.ambient.toFixed(1);
+        const objC = data.object.toFixed(1);
+        const ambF = (data.ambient * 1.8 + 32).toFixed(1);
+        const objF = (data.object * 1.8 + 32).toFixed(1);
+
+        document.getElementById('ambientC').innerText = ambC + ' °C';
+        document.getElementById('ambientF').innerText = ambF + ' °F';
+        document.getElementById('objectC').innerText = objC + ' °C';
+        document.getElementById('objectF').innerText = objF + ' °F';
+
+        document.getElementById('statusLight').style.background = 'green';
+
+        document.getElementById('ambientCard').style.boxShadow = tempToGlowColor(data.ambient);
+        document.getElementById('objectCard').style.boxShadow = tempToGlowColor(data.object);
+
+        document.getElementById('ambientBar').style.width = Math.min((data.ambient - 20) * 5, 100) + '%';
+        document.getElementById('objectBar').style.width = Math.min((data.object - 20) * 5, 100) + '%';
+        document.getElementById('ambientBar').style.background = tempToColor(data.ambient);
+        document.getElementById('objectBar').style.background = tempToColor(data.object);
+
+      } catch (err) {
+        document.getElementById('ambientC').innerText = '-- °C';
+        document.getElementById('ambientF').innerText = '-- °F';
+        document.getElementById('objectC').innerText = '-- °C';
+        document.getElementById('objectF').innerText = '-- °F';
+        document.getElementById('statusLight').style.background = 'red';
+        document.getElementById('ambientCard').style.boxShadow = '0 0 30px rgba(255, 0, 0, 0.6)';
+        document.getElementById('objectCard').style.boxShadow = '0 0 30px rgba(255, 0, 0, 0.6)';
+        document.getElementById('ambientBar').style.width = '0%';
+        document.getElementById('objectBar').style.width = '0%';
       }
     }
 

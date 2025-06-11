@@ -1,14 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ESP32 Temperature Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Realtime Temperature</title>
   <style>
     body {
-      background: #0e0e2c;
-      color: #ffffff;
+      background-color: #0e0e2c;
+      color: #fff;
       font-family: 'Segoe UI', sans-serif;
       text-align: center;
       margin: 0;
@@ -16,7 +15,7 @@
     }
     h1 {
       color: #00cfff;
-      margin-bottom: 10px;
+      margin-bottom: 30px;
     }
     .card {
       background: #1e1e3f;
@@ -25,159 +24,130 @@
       margin: 20px auto;
       width: 90%;
       max-width: 500px;
-      box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
-      transition: box-shadow 0.5s ease;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+      transition: box-shadow 0.6s ease;
     }
-    .glow {
-      box-shadow: 0 0 30px 5px red;
+    .temp-value {
+      font-size: 2em;
+      margin: 10px 0;
     }
     .label {
       font-size: 1.2em;
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
     }
-    .status-dot {
+    .status-light {
+      display: inline-block;
       width: 12px;
       height: 12px;
       border-radius: 50%;
-      background-color: gray;
+      margin-right: 8px;
     }
-    .bar-container {
-      background: #222;
-      border-radius: 12px;
-      height: 30px;
-      margin-top: 10px;
-      overflow: hidden;
-    }
-    .bar {
-      height: 100%;
-      width: 0%;
-      transition: width 0.6s ease;
-      border-radius: 12px;
-    }
-    .temp-value {
-      font-size: 1.5em;
-    }
-
     @media (max-width: 600px) {
-      h1 {
-        font-size: 1.4em;
-      }
-      .label {
-        font-size: 1em;
-      }
+      .temp-value { font-size: 1.5em; }
+      .label { font-size: 1em; }
+    }
+    #installBanner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #1e1e3f;
+      color: white;
+      padding: 15px;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 9999;
+    }
+    #installBanner button {
+      background-color: #00cfff;
+      color: black;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 1em;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <h1>ESP32 Live Temperature</h1>
+  <h1>Realtime Temperature</h1>
 
   <div class="card" id="ambientCard">
-    <div class="label">
-      <div class="status-dot" id="statusDotAmbient"></div>
-      🌡️ Ambient Temperature
-    </div>
+    <div class="label"><span class="status-light" id="statusLight" style="background:red"></span>🌡️ Ambient Temperature</div>
     <div id="ambientC" class="temp-value">-- °C</div>
     <div id="ambientF" class="temp-value">-- °F</div>
-    <div class="bar-container"><div id="ambientBar" class="bar"></div></div>
   </div>
 
   <div class="card" id="objectCard">
-    <div class="label">
-      <div class="status-dot" id="statusDotObject"></div>
-      🔥 Object Temperature
-    </div>
+    <div class="label">🔥 Object Temperature</div>
     <div id="objectC" class="temp-value">-- °C</div>
     <div id="objectF" class="temp-value">-- °F</div>
-    <div class="bar-container"><div id="objectBar" class="bar"></div></div>
+  </div>
+
+  <div id="installBanner">
+    <span>Add this app to your home screen for quick access.</span>
+    <button id="installBtn">Add</button>
   </div>
 
   <script>
-    let online = false;
+    let deferredPrompt;
+    const installBanner = document.getElementById('installBanner');
+    const installBtn = document.getElementById('installBtn');
 
-    function tempToColor(tempC) {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBanner.style.display = 'flex';
+    });
+
+    installBtn.addEventListener('click', () => {
+      installBanner.style.display = 'none';
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt = null;
+      }
+    });
+
+    function tempToGlowColor(tempC) {
       let percent = Math.min(Math.max((tempC - 20) / 20, 0), 1);
       let r = Math.round(255 * percent);
       let b = Math.round(255 * (1 - percent));
-      return `rgb(${r},0,${b})`;
-    }
-
-    function updateBars(data) {
-      let ambC = data.ambient.toFixed(1);
-      let objC = data.object.toFixed(1);
-      let ambF = (data.ambient * 1.8 + 32).toFixed(1);
-      let objF = (data.object * 1.8 + 32).toFixed(1);
-
-      document.getElementById('ambientC').innerText = ambC + " °C";
-      document.getElementById('ambientF').innerText = ambF + " °F";
-      document.getElementById('objectC').innerText = objC + " °C";
-      document.getElementById('objectF').innerText = objF + " °F";
-
-      let ambPercent = Math.min(Math.max((data.ambient - 20) * 5, 0), 100);
-      let objPercent = Math.min(Math.max((data.object - 20) * 5, 0), 100);
-
-      const ambBar = document.getElementById('ambientBar');
-      const objBar = document.getElementById('objectBar');
-
-      ambBar.style.width = ambPercent + "%";
-      objBar.style.width = objPercent + "%";
-
-      ambBar.style.background = tempToColor(data.ambient);
-      objBar.style.background = tempToColor(data.object);
-
-      // Glow based on object temperature
-      let glowColor = tempToColor(data.object);
-      document.getElementById('ambientCard').style.boxShadow = `0 0 20px ${tempToColor(data.ambient)}`;
-      document.getElementById('objectCard').style.boxShadow = `0 0 20px ${glowColor}`;
-
-      document.getElementById('statusDotAmbient').style.backgroundColor = 'lime';
-      document.getElementById('statusDotObject').style.backgroundColor = 'lime';
+      return `0 0 30px rgb(${r},0,${b})`;
     }
 
     async function fetchData() {
       try {
-        const res = await fetch('https://livetempesp32-default-rtdb.firebaseio.com/temperature.json');
-        const data = await res.json();
-        if (data && data.ambient !== undefined && data.object !== undefined) {
-          online = true;
-          updateBars(data);
-        } else {
-          throw new Error("No data");
-        }
-      } catch (e) {
-        console.warn("Disconnected");
-        online = false;
-        document.getElementById('ambientC').innerText = "-- °C";
-        document.getElementById('ambientF').innerText = "-- °F";
-        document.getElementById('objectC').innerText = "-- °C";
-        document.getElementById('objectF').innerText = "-- °F";
-        document.getElementById('ambientBar').style.width = "0%";
-        document.getElementById('objectBar').style.width = "0%";
-        document.getElementById('statusDotAmbient').style.backgroundColor = 'red';
-        document.getElementById('statusDotObject').style.backgroundColor = 'red';
+        const response = await fetch('https://livetempesp32-default-rtdb.firebaseio.com/temperature.json');
+        if (!response.ok) throw new Error("Disconnected");
+        const data = await response.json();
+
+        const ambC = data.ambient.toFixed(1);
+        const objC = data.object.toFixed(1);
+        const ambF = (data.ambient * 1.8 + 32).toFixed(1);
+        const objF = (data.object * 1.8 + 32).toFixed(1);
+
+        document.getElementById('ambientC').innerText = ambC + ' °C';
+        document.getElementById('ambientF').innerText = ambF + ' °F';
+        document.getElementById('objectC').innerText = objC + ' °C';
+        document.getElementById('objectF').innerText = objF + ' °F';
+
+        document.getElementById('statusLight').style.background = 'green';
+
+        document.getElementById('ambientCard').style.boxShadow = tempToGlowColor(data.ambient);
+        document.getElementById('objectCard').style.boxShadow = tempToGlowColor(data.object);
+      } catch (err) {
+        document.getElementById('ambientC').innerText = '-- °C';
+        document.getElementById('ambientF').innerText = '-- °F';
+        document.getElementById('objectC').innerText = '-- °C';
+        document.getElementById('objectF').innerText = '-- °F';
+        document.getElementById('statusLight').style.background = 'red';
+        document.getElementById('ambientCard').style.boxShadow = '0 0 30px rgba(255, 0, 0, 0.6)';
+        document.getElementById('objectCard').style.boxShadow = '0 0 30px rgba(255, 0, 0, 0.6)';
       }
     }
 
-    setInterval(fetchData, 1000);
+    setInterval(fetchData, 1500);
     fetchData();
-
-    // PWA install prompt
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      setTimeout(() => {
-        const prompt = confirm("Install Live Temp Dashboard on your home screen?");
-        if (prompt && deferredPrompt) {
-          deferredPrompt.prompt();
-        }
-      }, 2000);
-    });
   </script>
 </body>
 </html>
-
-

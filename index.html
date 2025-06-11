@@ -32,7 +32,7 @@
       border-radius: 50%;
       background: red;
       position: relative;
-      top: 4px; /* Move 2px down */
+      top: 6px; /* Move 2px down */
     }
     .card {
       background: #1e1e3f;
@@ -138,6 +138,16 @@
 
     let lastDataTime = 0;
     const TIMEOUT = 2000; // 2 seconds timeout
+    let lastAmbientC = '-- °C';
+    let lastAmbientF = '-- °F';
+    let lastObjectC = '-- °C';
+    let lastObjectF = '-- °F';
+    let lastAmbientBarWidth = '0%';
+    let lastObjectBarWidth = '0%';
+    let lastAmbientBarColor = 'red';
+    let lastObjectBarColor = 'red';
+    let lastAmbientGlow = '0 0 30px rgba(255, 0, 0, 0.6)';
+    let lastObjectGlow = '0 0 30px rgba(255, 0, 0, 0.6)';
 
     function tempToGlowColor(tempC) {
       let percent = Math.min(Math.max((tempC - 20) / 20, 0), 1);
@@ -171,22 +181,35 @@
         const ambF = (data.ambient * 1.8 + 32).toFixed(1);
         const objF = (data.object * 1.8 + 32).toFixed(1);
 
-        document.getElementById('ambientC').innerText = ambC + ' °C';
-        document.getElementById('ambientF').innerText = ambF + ' °F';
-        document.getElementById('objectC').innerText = objC + ' °C';
-        document.getElementById('objectF').innerText = objF + ' °F';
+        // Update last known values
+        lastAmbientC = ambC + ' °C';
+        lastAmbientF = ambF + ' °F';
+        lastObjectC = objC + ' °C';
+        lastObjectF = objF + ' °F';
+        lastAmbientBarWidth = Math.min((data.ambient - 20) * 5, 100) + '%';
+        lastObjectBarWidth = Math.min((data.object - 20) * 5, 100) + '%';
+        lastAmbientBarColor = tempToColor(data.ambient);
+        lastObjectBarColor = tempToColor(data.object);
+        lastAmbientGlow = tempToGlowColor(data.ambient);
+        lastObjectGlow = tempToGlowColor(data.object);
 
+        // Update UI with new data
+        document.getElementById('ambientC').innerText = lastAmbientC;
+        document.getElementById('ambientF').innerText = lastAmbientF;
+        document.getElementById('objectC').innerText = lastObjectC;
+        document.getElementById('objectF').innerText = lastObjectF;
         document.getElementById('statusLight').style.background = 'limegreen';
-        document.getElementById('ambientCard').style.boxShadow = tempToGlowColor(data.ambient);
-        document.getElementById('objectCard').style.boxShadow = tempToGlowColor(data.object);
-
-        document.getElementById('ambientBar').style.width = Math.min((data.ambient - 20) * 5, 100) + '%';
-        document.getElementById('objectBar').style.width = Math.min((data.object - 20) * 5, 100) + '%';
-        document.getElementById('ambientBar').style.background = tempToColor(data.ambient);
-        document.getElementById('objectBar').style.background = tempToColor(data.object);
+        document.getElementById('ambientCard').style.boxShadow = lastAmbientGlow;
+        document.getElementById('objectCard').style.boxShadow = lastObjectGlow;
+        document.getElementById('ambientBar').style.width = lastAmbientBarWidth;
+        document.getElementById('objectBar').style.width = lastObjectBarWidth;
+        document.getElementById('ambientBar').style.background = lastAmbientBarColor;
+        document.getElementById('objectBar').style.background = lastObjectBarColor;
 
       } catch (err) {
-        if (Date.now() - lastDataTime > TIMEOUT) {
+        const now = Date.now();
+        if (now - lastDataTime > TIMEOUT) {
+          // Show dashes and red light after 2 seconds of no new data
           document.getElementById('ambientC').innerText = '-- °C';
           document.getElementById('ambientF').innerText = '-- °F';
           document.getElementById('objectC').innerText = '-- °C';
@@ -198,6 +221,19 @@
           document.getElementById('objectBar').style.width = '0%';
           document.getElementById('ambientBar').style.background = 'red';
           document.getElementById('objectBar').style.background = 'red';
+        } else {
+          // Retain last known values until timeout is reached
+          document.getElementById('ambientC').innerText = lastAmbientC;
+          document.getElementById('ambientF').innerText = lastAmbientF;
+          document.getElementById('objectC').innerText = lastObjectC;
+          document.getElementById('objectF').innerText = lastObjectF;
+          document.getElementById('statusLight').style.background = 'limegreen';
+          document.getElementById('ambientCard').style.boxShadow = lastAmbientGlow;
+          document.getElementById('objectCard').style.boxShadow = lastObjectGlow;
+          document.getElementById('ambientBar').style.width = lastAmbientBarWidth;
+          document.getElementById('objectBar').style.width = lastObjectBarWidth;
+          document.getElementById('ambientBar').style.background = lastAmbientBarColor;
+          document.getElementById('objectBar').style.background = lastObjectBarColor;
         }
       }
     }

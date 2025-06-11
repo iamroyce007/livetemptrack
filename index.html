@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live MLX90614 Temp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      background: #0e0e2c;
+      color: #ffffff;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 { color: #00cfff; }
+    .card {
+      background: #1e1e3f;
+      border-radius: 16px;
+      padding: 20px;
+      margin: 20px auto;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+    }
+    .bar-container {
+      background: #222;
+      border-radius: 12px;
+      height: 30px;
+      margin: 15px 0;
+      overflow: hidden;
+    }
+    .bar {
+      height: 100%;
+      width: 0%;
+      transition: width 0.6s ease;
+      border-radius: 12px;
+    }
+    .label {
+      font-size: 1.2em;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>MLX90614 Live Temp Dashboard</h1>
+
+  <div class="card">
+    <div class="label">🌡️ Ambient Temperature</div>
+    <div id="ambientC">-- °C</div>
+    <div id="ambientF">-- °F</div>
+    <div class="bar-container"><div id="ambientBar" class="bar"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="label">🔥 Object Temperature</div>
+    <div id="objectC">-- °C</div>
+    <div id="objectF">-- °F</div>
+    <div class="bar-container"><div id="objectBar" class="bar"></div></div>
+  </div>
+
+  <script>
+    const dbUrl = "https://livetempesp32-default-rtdb.firebaseio.com/temperature.json";
+
+    function tempToColor(tempC) {
+      let percent = Math.min(Math.max((tempC - 20) / 20, 0), 1);
+      let r = Math.round(255 * percent);
+      let b = Math.round(255 * (1 - percent));
+      return `rgb(${r},0,${b})`;
+    }
+
+    function updateBars(data) {
+      let ambC = data.ambient.toFixed(1);
+      let objC = data.object.toFixed(1);
+      let ambF = (data.ambient * 1.8 + 32).toFixed(1);
+      let objF = (data.object * 1.8 + 32).toFixed(1);
+
+      document.getElementById('ambientC').innerText = ambC + " °C";
+      document.getElementById('ambientF').innerText = ambF + " °F";
+      document.getElementById('objectC').innerText = objC + " °C";
+      document.getElementById('objectF').innerText = objF + " °F";
+
+      let ambPercent = Math.min(Math.max((data.ambient - 20) * 5, 0), 100);
+      let objPercent = Math.min(Math.max((data.object - 20) * 5, 0), 100);
+
+      const ambBar = document.getElementById('ambientBar');
+      const objBar = document.getElementById('objectBar');
+
+      ambBar.style.width = ambPercent + "%";
+      objBar.style.width = objPercent + "%";
+
+      ambBar.style.background = tempToColor(data.ambient);
+      objBar.style.background = tempToColor(data.object);
+    }
+
+    async function fetchData() {
+      try {
+        const response = await fetch(dbUrl);
+        const data = await response.json();
+        if (data) updateBars(data);
+      } catch (e) {
+        console.error("Error fetching data:", e);
+      }
+    }
+
+    setInterval(fetchData, 1000);
+    fetchData();
+  </script>
+</body>
+</html>

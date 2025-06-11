@@ -15,7 +15,24 @@
     }
     h1 {
       color: #00cfff;
-      margin-bottom: 30px;
+      margin-bottom: 10px;
+    }
+    .header-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .status-light {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: red;
+      position: relative;
+      top: 2px; /* Move 2px down */
     }
     .card {
       background: #1e1e3f;
@@ -47,14 +64,6 @@
       background: red;
       transition: width 0.5s ease, background 0.5s ease;
     }
-    .status-light {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      margin-right: 8px;
-      background: red;
-    }
     @media (max-width: 600px) {
       .temp-value { font-size: 1.5em; }
       .label { font-size: 1em; }
@@ -84,10 +93,13 @@
   </style>
 </head>
 <body>
-  <h1>Realtime Temperature</h1>
+  <div class="header-status">
+    <h1>Realtime Temperature</h1>
+    <span class="status-light" id="statusLight"></span>
+  </div>
 
   <div class="card" id="ambientCard">
-    <div class="label"><span class="status-light" id="statusLight"></span>🌡️ Ambient Temperature</div>
+    <div class="label">🌡️ Ambient Temperature</div>
     <div id="ambientC" class="temp-value">-- °C</div>
     <div id="ambientF" class="temp-value">-- °F</div>
     <div class="bar-container"><div id="ambientBar" class="bar"></div></div>
@@ -124,7 +136,8 @@
       }
     });
 
-    let lastTimestamp = 0;
+    let lastDataTime = 0;
+    const TIMEOUT = 2000; // 2 seconds timeout
 
     function tempToGlowColor(tempC) {
       let percent = Math.min(Math.max((tempC - 20) / 20, 0), 1);
@@ -146,7 +159,12 @@
         if (!response.ok) throw new Error("Disconnected");
         const data = await response.json();
 
-        if (!data || typeof data.ambient !== 'number' || typeof data.object !== 'number') throw new Error("Invalid data");
+        const now = Date.now();
+        const stale = (now - lastDataTime > TIMEOUT);
+
+        if (!data || typeof data.ambient !== 'number' || typeof data.object !== 'number') throw new Error("Invalid");
+
+        lastDataTime = now;
 
         const ambC = data.ambient.toFixed(1);
         const objC = data.object.toFixed(1);
@@ -159,7 +177,6 @@
         document.getElementById('objectF').innerText = objF + ' °F';
 
         document.getElementById('statusLight').style.background = 'limegreen';
-
         document.getElementById('ambientCard').style.boxShadow = tempToGlowColor(data.ambient);
         document.getElementById('objectCard').style.boxShadow = tempToGlowColor(data.object);
 
@@ -168,10 +185,8 @@
         document.getElementById('ambientBar').style.background = tempToColor(data.ambient);
         document.getElementById('objectBar').style.background = tempToColor(data.object);
 
-        lastTimestamp = Date.now();
       } catch (err) {
-        const now = Date.now();
-        if (now - lastTimestamp > 2500) {
+        if (Date.now() - lastDataTime > TIMEOUT) {
           document.getElementById('ambientC').innerText = '-- °C';
           document.getElementById('ambientF').innerText = '-- °F';
           document.getElementById('objectC').innerText = '-- °C';

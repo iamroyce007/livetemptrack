@@ -2,17 +2,22 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Live Temperature Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 Temperature Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <link rel="manifest" href="manifest.json">
   <style>
     body {
       background: #0e0e2c;
       color: #ffffff;
       font-family: 'Segoe UI', sans-serif;
       text-align: center;
+      margin: 0;
       padding: 20px;
     }
-    h1 { color: #00cfff; }
+    h1 {
+      color: #00cfff;
+      margin-bottom: 10px;
+    }
     .card {
       background: #1e1e3f;
       border-radius: 16px;
@@ -20,46 +25,78 @@
       margin: 20px auto;
       width: 90%;
       max-width: 500px;
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+      box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+      transition: box-shadow 0.5s ease;
+    }
+    .glow {
+      box-shadow: 0 0 30px 5px red;
+    }
+    .label {
+      font-size: 1.2em;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: gray;
     }
     .bar-container {
       background: #222;
       border-radius: 12px;
       height: 30px;
-      margin: 15px 0;
+      margin-top: 10px;
       overflow: hidden;
     }
     .bar {
       height: 100%;
       width: 0%;
-      transition: width 1s ease;
+      transition: width 0.6s ease;
       border-radius: 12px;
     }
-    .label {
-      font-size: 1.2em;
-      margin-top: 10px;
+    .temp-value {
+      font-size: 1.5em;
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 1.4em;
+      }
+      .label {
+        font-size: 1em;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>MLX90614 Live Temp Dashboard</h1>
+  <h1>ESP32 Live Temperature</h1>
 
-  <div class="card">
-    <div class="label">🌡️ Ambient Temperature</div>
-    <div id="ambientC">-- °C</div>
-    <div id="ambientF">-- °F</div>
+  <div class="card" id="ambientCard">
+    <div class="label">
+      <div class="status-dot" id="statusDotAmbient"></div>
+      🌡️ Ambient Temperature
+    </div>
+    <div id="ambientC" class="temp-value">-- °C</div>
+    <div id="ambientF" class="temp-value">-- °F</div>
     <div class="bar-container"><div id="ambientBar" class="bar"></div></div>
   </div>
 
-  <div class="card">
-    <div class="label">🔥 Object Temperature</div>
-    <div id="objectC">-- °C</div>
-    <div id="objectF">-- °F</div>
+  <div class="card" id="objectCard">
+    <div class="label">
+      <div class="status-dot" id="statusDotObject"></div>
+      🔥 Object Temperature
+    </div>
+    <div id="objectC" class="temp-value">-- °C</div>
+    <div id="objectF" class="temp-value">-- °F</div>
     <div class="bar-container"><div id="objectBar" class="bar"></div></div>
   </div>
 
   <script>
-    const dbUrl = "https://livetempesp32-default-rtdb.firebaseio.com/temperature.json";
+    let online = false;
 
     function tempToColor(tempC) {
       let percent = Math.min(Math.max((tempC - 20) / 20, 0), 1);
@@ -90,20 +127,55 @@
 
       ambBar.style.background = tempToColor(data.ambient);
       objBar.style.background = tempToColor(data.object);
+
+      // Glow based on object temperature
+      let glowColor = tempToColor(data.object);
+      document.getElementById('ambientCard').style.boxShadow = `0 0 20px ${tempToColor(data.ambient)}`;
+      document.getElementById('objectCard').style.boxShadow = `0 0 20px ${glowColor}`;
+
+      document.getElementById('statusDotAmbient').style.backgroundColor = 'lime';
+      document.getElementById('statusDotObject').style.backgroundColor = 'lime';
     }
 
     async function fetchData() {
       try {
-        const response = await fetch(dbUrl);
-        const data = await response.json();
-        if (data) updateBars(data);
+        const res = await fetch('https://livetempesp32-default-rtdb.firebaseio.com/temperature.json');
+        const data = await res.json();
+        if (data && data.ambient !== undefined && data.object !== undefined) {
+          online = true;
+          updateBars(data);
+        } else {
+          throw new Error("No data");
+        }
       } catch (e) {
-        console.error("Fetch error:", e);
+        console.warn("Disconnected");
+        online = false;
+        document.getElementById('ambientC').innerText = "-- °C";
+        document.getElementById('ambientF').innerText = "-- °F";
+        document.getElementById('objectC').innerText = "-- °C";
+        document.getElementById('objectF').innerText = "-- °F";
+        document.getElementById('ambientBar').style.width = "0%";
+        document.getElementById('objectBar').style.width = "0%";
+        document.getElementById('statusDotAmbient').style.backgroundColor = 'red';
+        document.getElementById('statusDotObject').style.backgroundColor = 'red';
       }
     }
 
-    setInterval(fetchData, 2000); // Match ESP32 update
-    fetchData(); // Initial
+    setInterval(fetchData, 1000);
+    fetchData();
+
+    // PWA install prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      setTimeout(() => {
+        const prompt = confirm("Install Live Temp Dashboard on your home screen?");
+        if (prompt && deferredPrompt) {
+          deferredPrompt.prompt();
+        }
+      }, 2000);
+    });
   </script>
 </body>
 </html>
